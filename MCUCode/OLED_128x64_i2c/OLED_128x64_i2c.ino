@@ -14,6 +14,8 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void setup() {
+  pinMode(8, OUTPUT);
+  pinMode(9, OUTPUT);
   Serial.begin(115200);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
@@ -34,10 +36,15 @@ void setup() {
 }
 
 void loop() {
+
+  digitalWrite(8,HIGH);
+  digitalWrite(9,HIGH);
   // Scroll in various directions, pausing in-between:
   display.startscrollright(0x00, 0x0F);
   delay(2000);
   display.stopscroll();
+  digitalWrite(8,LOW);
+  digitalWrite(9,LOW);
   delay(1000);
   display.startscrollleft(0x00, 0x0F);
   delay(2000);
