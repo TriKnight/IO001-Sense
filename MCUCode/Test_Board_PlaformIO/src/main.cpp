@@ -1,5 +1,7 @@
 #include <Arduino.h>
-
+#include <RTCTimer.h>
+#include <Sodaq_DS3231.h>
+#include <Wire.h>
 
 // Select Your Modem
 #define TINY_GSM_MODEM_SIM800
@@ -18,6 +20,7 @@
 #define TINY_GSM_TEST_SMS false
 #define TINY_GSM_TEST_USSD true
 #define TINY_GSM_TEST_BATTERY true
+
 // powerdown modem after tests
 #define TINY_GSM_POWERDOWN false
 // Set phone numbers, if you want to test SMS and Calls
@@ -31,14 +34,44 @@ const char gprsPass[] = "";
 
 // Include TinyGSM
 #include <TinyGsmClient.h>
+#include <BlynkSimpleTinyGSM.h>
 
 int BEE_DTR_PIN = 23;  // Bee DTR Pin (Data Terminal Ready - used for sleep)
 #define APN "v-internet"
+char user[] = "";
+char pass[] = "";
+
 TinyGsm modem(SerialAT);
+RTCTimer timer;  // The timer functions for the RTC
 
+// Go to the Project Settings (nut icon).
+char auth[] = "6ek7cPHk1WfC1i-aFhYDcZwSqPtGPqq2";
 
+// Program with Virtual Pin
+BlynkTimer timer_blynk;
+void myTimerEvent()
+{ 
+  rtc.convertTemperature();  //convert current temperature into registers
+  float tempVal = rtc.getTemperature();
+  #define V5  5
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+  Blynk.virtualWrite(V5, tempVal);
+
+}
+
+// This function sends Arduino's up time every second to Virtual Pin (5).
+// In the app, Widget's reading frequency should be set to PUSH. This means
+// that you define how often to send data to Blynk App.
+
+//
 void setup()
 {
+
+    Wire.begin();
+    rtc.begin();
+    delay(100);
+
     pinMode(BEE_DTR_PIN,OUTPUT); // . This is enable the DeepSleep Mode
     digitalWrite(BEE_DTR_PIN,LOW); // Output LOW- Disabled the Sleep Mode, Output-HIGH- Enable SLeep Mode
     Serial.begin(GSM_AUTOBAUD_MIN );
@@ -120,10 +153,17 @@ void setup()
   // String gsmDate = modem.getGSMDateTime(DATE_DATE);
   // DBG("GSM Date:", gsmDate);
 #endif
+Serial.println("Initializing modem...");
+  modem.restart();
+
+//Start Blink App
+Blynk.begin(auth, modem, apn, user, pass);
+timer_blynk.setInterval(1000L, myTimerEvent);
 }
 
 
 void loop()
 {
-
+Blynk.run();
+timer_blynk.run(); // Initiates BlynkTimer
 }

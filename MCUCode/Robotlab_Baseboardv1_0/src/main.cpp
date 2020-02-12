@@ -24,7 +24,7 @@ const char *LOGGERNAME = "RoboIoT001";
 const char *FILE_NAME = "SENSE001";
 const char *DATA_HEADER = "JSON Formatted Data";
 const int TIME_ZONE = +0;
-// Register your site and get these tokens from data.envirodiy.org
+// Register your site and get these tokens 
 const char *REGISTRATION_TOKEN = "3522beb5-f508-458f-b3f2-f37b00068bc7";
 const char *SAMPLING_FEATURE = "5bdba7fd-d356-410b-b75f-a44c2a4eea77";
 const char *ONBOARD_TEMPERATURE_UUID = "ad6b2392-1e32-4f95-b8f7-394f98957b8a";
@@ -36,14 +36,45 @@ const char *ONBOARD_BATTERY_UUID = "443f94f4-9e1e-4068-bdc6-ba0496bfbcbe";
 //--------------------------------
 // 4. Timming Option for Logging
 //--------------------------------
-int LOGGING_INTERVAL = 1;  // How frequently (in minutes) to log data
-int READ_DELAY = 1;  // How often (in minutes) the timer wakes up
-int UPDATE_RATE = 200; // How frequently (in milliseconds) the logger checks if it should log
+int LOGGING_INTERVAL = 2;  // How frequently (in minutes) to log data
+int READ_DELAY = 2;  // How often (in minutes) the timer wakes up
+int UPDATE_RATE = 2000; // How frequently (in milliseconds) the logger checks if it should log
 int COMMAND_TIMEOUT = 15000;  // How long (in milliseconds) to wait for a server response
 
 //--------------------------------
 // 5. Web Service and Setup
 //--------------------------------
+#define TINY_GSM_MODEM_SIM800
+#define SerialMon Serial
+#define SerialAT Serial1
+#define TINY_GSM_DEBUG SerialMon
+// INITIAL Parameters
+#define GSM_AUTOBAUD_MIN 9600
+#define GSM_AUTOBAUD_MAX 19200
+// Define how you're planning to connect to the internet
+#define TINY_GSM_TEST_GPRS true
+#define TINY_GSM_USE_GPRS true
+#define TINY_GSM_TEST_CALL true
+#define TINY_GSM_TEST_SMS false
+#define TINY_GSM_TEST_USSD true
+#define TINY_GSM_TEST_BATTERY true
+//--------------------------------
+// 5.1 Tiny GSM Function
+//--------------------------------
+// powerdown modem after tests
+#define TINY_GSM_POWERDOWN false
+// Set phone numbers, if you want to test SMS and Calls
+#define SMS_TARGET  "+84356250455"
+//#define CALL_TARGET "+380xxxxxxxxx"
+// Your GPRS credentials, if any
+const char apn[]  = "v-internet";
+char user[] = "";
+char pass[] = "";
+// Include TinyGSM
+#include <TinyGsmClient.h>
+#include <BlynkSimpleTinyGSM.h>
+// Go to the Project Settings (nut icon).
+char auth[] = "6ek7cPHk1WfC1i-aFhYDcZwSqPtGPqq2";
 
 //--------------------------------
 // 6. Board setup Info
@@ -58,7 +89,7 @@ int RTC_PIN = A8;  // RTC Interrupt pin
 #define RTC_INT_PERIOD EveryMinute  //The interrupt period on the RTC
 int BATTERY_PIN = A7;    // select the input pin for the potentiometer
 int SD_SS_PIN = 12;  // SD Card Pin
-int BEECTS = 8;
+//int BEECTS = 8;
 
 
 //--------------------------------
@@ -77,13 +108,52 @@ Sodaq_DS3231 sodaq;   // Controls the Real Time Clock Chip
 RTCTimer timer;  // The timer functions for the RTC
 SdFat SD;  // The SD initialization
 String fileName = String(FILE_NAME);  // For the file name
-GPRSbeeClass GPRS;
-
+TinyGsm modem(SerialAT);
+BlynkTimer timer_blynk;
 //--------------------------------
 // 8. Working Function
 //--------------------------------
-// Helper function to get the current date/time from the RTC
-// as a unix timestamp - and apply the correct time zone.
+
+// Communication Function
+// Timmer Event connect to the Blynk App
+void Blynk_app()
+{ 
+  rtc.convertTemperature();  //convert current temperature into registers
+  float tempVal = rtc.getTemperature();
+  #define V5  5
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+  Blynk.virtualWrite(V5, tempVal);
+
+}
+
+void Blynk_sleep(){
+  //Setup Sleep Mode for Modulde
+  digitalWrite(BEE_DTR_PIN,HIGH); // Enable SLEEP Mode
+  DBG("SetDTR-HIGH Enable Sleep Mode");
+  modem.sleepEnable();
+  DBG("Sleep Mode");
+  modem.radioOff();
+  DBG("Radiooff.");
+  modem.poweroff();
+  DBG("Poweroff.");
+  
+  delay(50);
+}
+
+// Setup the connection GSM and Blynk App
+void Blynk_setup(){
+  // Start GSM
+    //TinyGsmAutoBaud(SerialAT,GSM_AUTOBAUD_MIN,GSM_AUTOBAUD_MAX);
+    digitalWrite(BEE_DTR_PIN,LOW); // Diable SLEEP Mode
+    SerialAT.begin(BEE_BAUD);
+    delay(1000);
+    SerialMon.println("Setting modem...");
+    modem.restart();
+    //Start Blink App
+    Blynk.begin(auth, modem, apn, user, pass);
+    
+}
 // Flashess to Robolab_Baseboard's LED's
 void greenred4flash()
 {
@@ -112,11 +182,6 @@ uint32_t getNow()
   currentepochtime = rtc.now().getEpoch();
   currentepochtime += TIME_ZONE*3600;
   return currentepochtime;
-}
-// This function for the SMS sending via Sim800L Module
-void send_SMS()
-{
-  GPRS.sendSMS("+84356250455", "Hello anh Trí, em là Robot IoT");
 }
 
 // This function returns the datetime from the realtime clock as an ISO 8601 formated string
@@ -204,18 +269,21 @@ void sensorsWake()
 
 void systemSleep()
 {
+    // Sleep Blynk App
+ // Blynk_sleep();
   // This method handles any sensor specific sleep setup
   sensorsSleep();
 
   // Wait until the serial ports have finished transmitting
   Serial.flush();
   Serial1.flush();
-
+  
   // The next timed interrupt will not be sent until this is cleared
   rtc.clearINTStatus();
 
   // Disable ADC
   ADCSRA &= ~_BV(ADEN);
+
 
   // Sleep time
   noInterrupts();
@@ -294,6 +362,8 @@ void logData(String rec)
   logFile.close();
 }
 
+
+
 //--------------------------------
 // 9. Setup Function
 //--------------------------------
@@ -312,33 +382,37 @@ void setup() {
   //   Wire.begin();
   //   rtc.begin();
   //   rtc.setDateTime(dt); //Adjust date-time as defined 'dt' above 
-
+  
   // put your setup code here, to run once:
-    Serial.begin(SERIAL_BAUD);
+    SerialMon.begin(SERIAL_BAUD);
+  // Setup Blynk App
+    Blynk_setup();
+
     Wire.begin();
     rtc.begin();
     delay(100);
+
     // Set up pins for the LED's
     pinMode(GREEN_LED, OUTPUT);
     pinMode(RED_LED, OUTPUT);
  
     // Blink the LEDs to show the board is on and starting up
     greenred4flash();
+    
      // Set up the log file
     setupLogFile();
 
     // Setup timer events
     setupTimer();
-
+    
     // Setup sleep mode
-     setupSleep();
+    setupSleep();
      
     Serial.print(F("Now running "));
     Serial.println(SKETCH_NAME);
     Serial.print(F("Time: "));
     Serial.println(getDateTime_ISO8601());
-    
-  //  send_SMS();
+  
     
 }
 
@@ -346,41 +420,26 @@ void setup() {
 // 10. Loop function
 //--------------------------------
 void loop() {
-  //Setting Date adn Time
-  // DateTime now = rtc.now(); //get the current date-time
-  //   Serial.print(now.year(), DEC);
-  //   Serial.print('/');
-  //   Serial.print(now.month(), DEC);
-  //   Serial.print('/');
-  //   Serial.print(now.date(), DEC);
-  //   Serial.print(' ');
-  //   Serial.print(now.hour(), DEC);
-  //   Serial.print(':');
-  //   Serial.print(now.minute(), DEC);
-  //   Serial.print(':');
-  //   Serial.print(now.second(), DEC);
-  //   Serial.println();
-  //   Serial.print(weekDay[now.dayOfWeek()]);
-  //   Serial.println();
-  //   delay(1000);
-  // //------------------
-
-  // // put your main code here, to run repeatedly:
+  
       timer.update();
       if (currentminute % testminute == 0)
     {
         // Turn on the LED
         digitalWrite(GREEN_LED, HIGH);
+        
         // Print a few blank lines to show new reading
         Serial.println(F("\n---\n---\n"));
         // Get the sensor value(s), store as string
         updateAllSensors();
         //Save the data record to the log file
         logData(generateSensorDataJSON());
+      
         // Turn off the LED
         digitalWrite(GREEN_LED, LOW);
         // Advance the timer
-
+         // Void Blynk app
+        Blynk.run();
+        Blynk_app();
         testtimer++;
     }
 
