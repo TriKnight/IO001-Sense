@@ -36,9 +36,9 @@ const char *ONBOARD_BATTERY_UUID = "443f94f4-9e1e-4068-bdc6-ba0496bfbcbe";
 //--------------------------------
 // 4. Timming Option for Logging
 //--------------------------------
-int LOGGING_INTERVAL = 2;  // How frequently (in minutes) to log data
-int READ_DELAY = 2;  // How often (in minutes) the timer wakes up
-int UPDATE_RATE = 2000; // How frequently (in milliseconds) the logger checks if it should log
+int LOGGING_INTERVAL = 1;  // How frequently (in minutes) to log data
+int READ_DELAY = 1;  // How often (in minutes) the timer wakes up
+int UPDATE_RATE = 1000; // How frequently (in milliseconds) the logger checks if it should log
 int COMMAND_TIMEOUT = 15000;  // How long (in milliseconds) to wait for a server response
 
 //--------------------------------
@@ -120,25 +120,33 @@ void Blynk_app()
 { 
   rtc.convertTemperature();  //convert current temperature into registers
   float tempVal = rtc.getTemperature();
-  #define V5  5
+
   // You can send any value at any time.
   // Please don't send more that 10 values per second.
   Blynk.virtualWrite(V5, tempVal);
 
+//Get Checking Battery
+  uint8_t chargeState = -99;
+  int8_t percent = -99;
+  uint16_t milliVolts = -9999;
+  modem.getBattStats(chargeState, percent, milliVolts);
+  Blynk.virtualWrite(V6, percent);
+  Blynk.virtualWrite(V7, milliVolts / 1000.0F);
+  DBG("Battery charge 'percent':", percent);
+  DBG("Battery voltage:", milliVolts / 1000.0F);
 }
 
 void Blynk_sleep(){
   //Setup Sleep Mode for Modulde
   digitalWrite(BEE_DTR_PIN,HIGH); // Enable SLEEP Mode
-  DBG("SetDTR-HIGH Enable Sleep Mode");
-  modem.sleepEnable();
-  DBG("Sleep Mode");
-  modem.radioOff();
-  DBG("Radiooff.");
+ // DBG("SetDTR-HIGH Enable Sleep Mode");
+ // modem.radioOff();
+ // DBG("Radiooff.");
+ // modem.sleepEnable();
+  // DBG("Sleep Mode");
   modem.poweroff();
-  DBG("Poweroff.");
-  
-  delay(50);
+   DBG("Poweroff.");
+  delay(100);
 }
 
 // Setup the connection GSM and Blynk App
@@ -174,6 +182,15 @@ void errorBlinking_SD()
     digitalWrite(RED_LED, LOW);
     delay(100);
     digitalWrite(RED_LED, HIGH);
+    delay(100);
+  }
+}
+void StatusBlinking_SD()
+{
+  for (int i = 1; i <= 5; i++) {
+    digitalWrite(GREEN_LED, LOW);
+    delay(100);
+    digitalWrite(GREEN_LED, HIGH);
     delay(100);
   }
 }
@@ -269,8 +286,9 @@ void sensorsWake()
 
 void systemSleep()
 {
+   
     // Sleep Blynk App
- // Blynk_sleep();
+   Blynk_sleep();
   // This method handles any sensor specific sleep setup
   sensorsSleep();
 
@@ -297,6 +315,7 @@ void systemSleep()
 
   // This method handles any sensor specific wake setup
   sensorsWake();
+  
 }
 // Initializes the SDcard and prints a header to it
 void setupLogFile()
@@ -377,16 +396,9 @@ void logData(String rec)
 
 
 void setup() {
-  // //Seting Date and Time
-  //   Serial.begin(SERIAL_BAUD);
-  //   Wire.begin();
-  //   rtc.begin();
-  //   rtc.setDateTime(dt); //Adjust date-time as defined 'dt' above 
-  
-  // put your setup code here, to run once:
+  // put your setup code here, to run when the Board wake up
     SerialMon.begin(SERIAL_BAUD);
-  // Setup Blynk App
-    Blynk_setup();
+  
 
     Wire.begin();
     rtc.begin();
@@ -398,7 +410,8 @@ void setup() {
  
     // Blink the LEDs to show the board is on and starting up
     greenred4flash();
-    
+    // Setup Blynk App
+    Blynk_setup();
      // Set up the log file
     setupLogFile();
 
@@ -408,10 +421,10 @@ void setup() {
     // Setup sleep mode
     setupSleep();
      
-    Serial.print(F("Now running "));
-    Serial.println(SKETCH_NAME);
-    Serial.print(F("Time: "));
-    Serial.println(getDateTime_ISO8601());
+    SerialMon.print(F("Now running "));
+    SerialMon.println(SKETCH_NAME);
+    SerialMon.print(F("Time: "));
+    SerialMon.println(getDateTime_ISO8601());
   
     
 }
@@ -420,15 +433,16 @@ void setup() {
 // 10. Loop function
 //--------------------------------
 void loop() {
-  
+      
       timer.update();
+      
       if (currentminute % testminute == 0)
-    {
+    {  
         // Turn on the LED
         digitalWrite(GREEN_LED, HIGH);
         
         // Print a few blank lines to show new reading
-        Serial.println(F("\n---\n---\n"));
+        SerialMon.println(F("\n---\n---\n"));
         // Get the sensor value(s), store as string
         updateAllSensors();
         //Save the data record to the log file
@@ -437,6 +451,7 @@ void loop() {
         // Turn off the LED
         digitalWrite(GREEN_LED, LOW);
         // Advance the timer
+
          // Void Blynk app
         Blynk.run();
         Blynk_app();
