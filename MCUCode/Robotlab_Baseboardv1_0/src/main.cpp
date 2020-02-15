@@ -36,8 +36,8 @@ const char *ONBOARD_BATTERY_UUID = "443f94f4-9e1e-4068-bdc6-ba0496bfbcbe";
 //--------------------------------
 // 4. Timming Option for Logging
 //--------------------------------
-int LOGGING_INTERVAL = 1;  // How frequently (in minutes) to log data
-int READ_DELAY = 1;  // How often (in minutes) the timer wakes up
+int LOGGING_INTERVAL = 10;  // How frequently (in minutes) to log data
+int READ_DELAY = 10;  // How often (in minutes) the timer wakes up
 int UPDATE_RATE = 1000; // How frequently (in milliseconds) the logger checks if it should log
 int COMMAND_TIMEOUT = 15000;  // How long (in milliseconds) to wait for a server response
 
@@ -101,7 +101,7 @@ float ONBOARD_BATTERY = 0;  // variable to store the value coming from the senso
 // Variables for the timer function
 int currentminute;
 int testtimer = 0;
-int testminute = 1;
+int testminute = 10;
 long currentepochtime = 0;
 
 Sodaq_DS3231 sodaq;   // Controls the Real Time Clock Chip
@@ -137,15 +137,16 @@ void Blynk_app()
 }
 
 void Blynk_sleep(){
+  SerialAT.begin(BEE_BAUD);
   //Setup Sleep Mode for Modulde
-  digitalWrite(BEE_DTR_PIN,HIGH); // Enable SLEEP Mode
+  //digitalWrite(BEE_DTR_PIN,HIGH); // Enable SLEEP Mode
  // DBG("SetDTR-HIGH Enable Sleep Mode");
  // modem.radioOff();
  // DBG("Radiooff.");
- // modem.sleepEnable();
-  // DBG("Sleep Mode");
+ //  modem.sleepEnable();
+// DBG("Sleep Mode");
   modem.poweroff();
-   DBG("Poweroff.");
+//  DBG("Poweroff.");
   delay(100);
 }
 
@@ -155,9 +156,9 @@ void Blynk_setup(){
     //TinyGsmAutoBaud(SerialAT,GSM_AUTOBAUD_MIN,GSM_AUTOBAUD_MAX);
     digitalWrite(BEE_DTR_PIN,LOW); // Diable SLEEP Mode
     SerialAT.begin(BEE_BAUD);
-    delay(1000);
-    SerialMon.println("Setting modem...");
-    modem.restart();
+    //delay(1000);
+    //SerialMon.println("Setting modem...");
+    //modem.restart();
     //Start Blink App
     Blynk.begin(auth, modem, apn, user, pass);
     
@@ -285,16 +286,18 @@ void sensorsWake()
 // Puts the system to sleep to conserve battery life.
 
 void systemSleep()
-{
-   
+{ //  SerialMon.println(F("Goto Sleep"));
+   //SerialMon.println("Go to Sleep");
     // Sleep Blynk App
-   Blynk_sleep();
+  
+  Blynk_sleep();
   // This method handles any sensor specific sleep setup
   sensorsSleep();
 
   // Wait until the serial ports have finished transmitting
-  Serial.flush();
-  Serial1.flush();
+  SerialMon.flush(); // Working normally
+ // SerialAT.flush();
+ 
   
   // The next timed interrupt will not be sent until this is cleared
   rtc.clearINTStatus();
@@ -316,6 +319,7 @@ void systemSleep()
   // This method handles any sensor specific wake setup
   sensorsWake();
   
+  
 }
 // Initializes the SDcard and prints a header to it
 void setupLogFile()
@@ -323,7 +327,7 @@ void setupLogFile()
   // Initialise the SD card
   if (!SD.begin(SD_SS_PIN))
   {
-    Serial.println(F("Error: SD card failed to initialise or is missing."));
+   // Serial.println(F("Error: SD card failed to initialise or is missing."));
     errorBlinking_SD();
   }
 
@@ -396,36 +400,38 @@ void logData(String rec)
 
 
 void setup() {
-  // put your setup code here, to run when the Board wake up
-    SerialMon.begin(SERIAL_BAUD);
-  
-
-    Wire.begin();
-    rtc.begin();
-    delay(100);
-
-    // Set up pins for the LED's
-    pinMode(GREEN_LED, OUTPUT);
-    pinMode(RED_LED, OUTPUT);
- 
-    // Blink the LEDs to show the board is on and starting up
-    greenred4flash();
-    // Setup Blynk App
-    Blynk_setup();
-     // Set up the log file
-    setupLogFile();
-
-    // Setup timer events
-    setupTimer();
-    
-    // Setup sleep mode
-    setupSleep();
      
-    SerialMon.print(F("Now running "));
-    SerialMon.println(SKETCH_NAME);
-    SerialMon.print(F("Time: "));
-    SerialMon.println(getDateTime_ISO8601());
-  
+  // put your setup code here, to run when the Board wake up
+
+     SerialMon.begin(SERIAL_BAUD);
+
+     Wire.begin();
+     rtc.begin();
+     delay(100);
+
+    // // Set up pins for the LED's
+    //  pinMode(GREEN_LED, OUTPUT);
+    //  pinMode(RED_LED, OUTPUT);
+    // // Blink the LEDs to show the board is on and starting up
+    // greenred4flash();
+
+   //  SerialMon.println(F("Running setup "));
+    
+    //  // Set up the log file
+     setupLogFile();
+
+    // // Setup timer events
+
+     setupTimer();
+    
+    // // Setup sleep mode
+    setupSleep();
+    
+    // SerialMon.print(F("Now running "));
+    // SerialMon.println(SKETCH_NAME);
+    // SerialMon.print(F("Time: "));
+     //SerialMon.println(getDateTime_ISO8601());
+     
     
 }
 
@@ -433,29 +439,35 @@ void setup() {
 // 10. Loop function
 //--------------------------------
 void loop() {
-      
-      timer.update();
-      
+     //This code for setting the timer
+  //   SerialMon.println(F("Running loop"));
+     DateTime now = rtc.now(); 
+     currentminute= now.minute();
+     timer.update();
       if (currentminute % testminute == 0)
-    {  
-        // Turn on the LED
-        digitalWrite(GREEN_LED, HIGH);
-        
-        // Print a few blank lines to show new reading
-        SerialMon.println(F("\n---\n---\n"));
-        // Get the sensor value(s), store as string
-        updateAllSensors();
-        //Save the data record to the log file
-        logData(generateSensorDataJSON());
-      
-        // Turn off the LED
-        digitalWrite(GREEN_LED, LOW);
-        // Advance the timer
-
-         // Void Blynk app
-        Blynk.run();
-        Blynk_app();
+    {  // // Setup Blynk App
+         Blynk_setup();
+        // // Turn on the LED
+        // digitalWrite(GREEN_LED, HIGH);
+         
+        // // Print a few blank lines to show new reading
+    //    SerialMon.println(F("Running if loop"));
+      //  SerialMon.println(F("\n---\n---\n"));
+        //SerialMon.println(currentminute);
+        // // Get the sensor value(s), store as string
+         updateAllSensors();
+        // //Save the data record to the log file
+         logData(generateSensorDataJSON());
+         //   Void Blynk app
+         Blynk.run();
+         Blynk_app();
+         delay(1000); // Working nomarlly
+        // // Turn off the LED
+       //  digitalWrite(GREEN_LED, LOW);
+        // // Advance the timer
         testtimer++;
+        
+       
     }
 
     if (testtimer >= LOGGING_INTERVAL)

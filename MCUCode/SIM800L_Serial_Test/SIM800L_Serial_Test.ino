@@ -20,13 +20,13 @@ void setup()
     Serial.begin(SERIAL_BAUD);
     Serial1.begin(BEE_BAUD); // Enable the Serial Communication with the Sim Module
   
-  //Serial.println("Initializing...");
-  //delay(1000);
-  //Serial1.println("AT"); //Once the handshake test is successful, i t will back to OK
-  //updateSerial();
+  Serial.println("Initializing...");
+  delay(1000);
+  Serial1.println("AT"); //Once the handshake test is successful, i t will back to OK
+  updateSerial();
   //GPRS.init(Serial1, BEECTS,BEE_DTR_PIN);
-  GPRS.off();
-  GPRS.sendSMS("+84356250455", "Hello anh Trí, em là Robot IoT");
+  //GPRS.off();
+  //GPRS.sendSMS("+84356250455", "Hello anh Trí, em là Robot IoT");
   updateSerial();
   Serial1.write(26); //  Call the number
   
@@ -42,7 +42,7 @@ void setup()
 void loop()
 {
   //digitalWrite(23, LOW);
- // updateSerial();
+  updateSerial();
 }
 void updateSerial()
 {
